@@ -188,13 +188,40 @@ function cmdStats() {
   const stats = store.getStats();
   const entities = store.getAllEntities();
   const unindexed = store.getMemoriesWithoutEmbeddings(1000);
+  const all = store.getAllMemories(500);
+  
+  // Source type distribution
+  const typeDist: Record<string, number> = {};
+  const catDist: Record<string, number> = {};
+  for (const m of all) {
+    typeDist[m.attribution.type] = (typeDist[m.attribution.type] ?? 0) + 1;
+    catDist[m.category] = (catDist[m.category] ?? 0) + 1;
+  }
+  
+  // Most accessed
+  const mostAccessed = [...all].sort((a, b) => b.accessCount - a.accessCount).slice(0, 5);
+  
+  // Narrative count
+  const narrative = new NarrativeLayer();
+  const narrativeCount = narrative.getRecent(100).length;
   
   console.log('📊 Agent Memory Stats\n');
   console.log(`   Memories:        ${stats.memories}`);
   console.log(`   Entities:        ${stats.entities}`);
+  console.log(`   Narratives:      ${narrativeCount}`);
   console.log(`   Avg Confidence:  ${stats.avgConfidence}`);
   console.log(`   Avg Relevance:   ${stats.avgRelevance}`);
   console.log(`   Unindexed:       ${unindexed.length}`);
+  
+  console.log(`\n   Sources: ${Object.entries(typeDist).map(([k,v]) => `${k}=${v}`).join(', ')}`);
+  console.log(`   Categories: ${Object.entries(catDist).map(([k,v]) => `${k}=${v}`).join(', ')}`);
+  
+  if (mostAccessed.length > 0 && mostAccessed[0].accessCount > 0) {
+    console.log('\n   Most recalled:');
+    for (const m of mostAccessed.filter(m => m.accessCount > 0)) {
+      console.log(`     [${m.accessCount}x] ${m.summary ?? m.content.slice(0, 60)}`);
+    }
+  }
   
   if (entities.length > 0) {
     console.log('\n   Top entities:');

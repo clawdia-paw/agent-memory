@@ -87,10 +87,17 @@ export class SessionMemory {
     }
 
     // 2. Pinned procedures & lessons (highest value — these prevent mistakes)
-    // Sort by access count (most-used first) then by confidence
+    // Sort by: access count (most-recalled first), then confidence, then recency
     const procedurePins = pinned
       .filter(m => !identityPinned.includes(m))
-      .sort((a, b) => (b.accessCount - a.accessCount) || (b.confidence.score - a.confidence.score));
+      .sort((a, b) => {
+        // Primary: access count — memories I keep looking up are clearly important
+        if (b.accessCount !== a.accessCount) return b.accessCount - a.accessCount;
+        // Secondary: confidence
+        if (b.confidence.score !== a.confidence.score) return b.confidence.score - a.confidence.score;
+        // Tertiary: recency
+        return b.created - a.created;
+      });
 
     if (procedurePins.length > 0) {
       addLine('\n## Core (Pinned)');
