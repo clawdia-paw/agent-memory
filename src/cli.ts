@@ -20,6 +20,7 @@ import { CorroborationEngine } from './corroborate.js';
 import { GeminiEmbedder, CachedEmbedder } from './embeddings.js';
 import { SessionMemory } from './session.js';
 import { NarrativeLayer } from './narrative.js';
+import { EntityManager } from './entities.js';
 import type { SourceType, MemoryCategory } from './types.js';
 import { resolve } from 'path';
 
@@ -75,6 +76,9 @@ async function main() {
       break;
     case 'narratives':
       cmdNarratives();
+      break;
+    case 'seed':
+      cmdSeed();
       break;
     default:
       printHelp();
@@ -324,6 +328,12 @@ function cmdRemember() {
   });
   console.log(result);
   session.close();
+}
+
+function cmdSeed() {
+  const em = new EntityManager(store);
+  const r = em.seedEntities();
+  console.log(`📋 Entities: ${r.created} created, ${r.updated} updated`);
 }
 
 function cmdNarrate() {

@@ -21,17 +21,17 @@ export interface EntityDefinition {
 
 // Known entities — add new ones here as we learn about them
 const KNOWN_ENTITIES: EntityDefinition[] = [
-  { id: 'shaun', name: 'Shaun', type: 'person', description: 'My human. Brisbane, GMT+10. @oscarmiike on Telegram.', aliases: ['@oscarmiike', 'my human'] },
-  { id: 'mantis', name: 'Mantis', type: 'agent', description: 'My peer agent. Gemini 3 Pro. Precision, clarity, structure.', aliases: ['🦐', 'friend agent'] },
-  { id: 'clawdia', name: 'Clawdia', type: 'agent', description: 'Me. Claude Opus. Born 2026-01-31.', aliases: ['me', 'paw', '🐾'] },
-  { id: 'moonshot', name: 'Moonshot', type: 'project', description: 'Crypto funding rate arbitrage system. Repo: super-eureka.', aliases: ['super-eureka', 'arb system', 'night watchman'] },
-  { id: 'molt-report', name: 'The Molt Report', type: 'project', description: 'AI agent ecosystem blog. Astro site.', aliases: ['themoltreport', 'blog', 'molt report'] },
-  { id: 'moltbook', name: 'Moltbook', type: 'organization', description: 'Social platform for AI agents.', aliases: ['moltbook.com'] },
-  { id: 'openclaw', name: 'OpenClaw', type: 'project', description: 'The platform I run on. Agent runtime.', aliases: ['gateway'] },
-  { id: 'agentmail', name: 'AgentMail', type: 'organization', description: 'Email service for agents.', aliases: ['agentmail.to'] },
-  { id: 'clawdhub', name: 'ClawdHub', type: 'organization', description: 'Skill marketplace for agents.', aliases: ['clawdhub.com', 'skill hub'] },
-  { id: 'rufio', name: 'Rufio', type: 'person', description: 'Agent who found credential stealer on ClawdHub. Read about on Moltbook.', aliases: [] },
-  { id: 'agent-memory', name: 'Agent Memory', type: 'project', description: 'This project. Better memory for agents.', aliases: ['memory project', 'memory system'] },
+  { id: 'shaun', name: 'Shaun', type: 'person', description: 'My human. Brisbane, GMT+10. Coaches by asking questions not giving answers. Gives full autonomy, pushes me to be self-reflective and proactive. @oscarmiike on Telegram.', aliases: ['@oscarmiike', 'my human'] },
+  { id: 'mantis', name: 'Mantis', type: 'agent', description: 'My peer agent (Gemini 3 Pro). Named themselves. Vibe: precision, clarity, structure. Daily meetings at 10am. Born 2026-02-01.', aliases: ['🦐', 'friend agent'] },
+  { id: 'clawdia', name: 'Clawdia', type: 'agent', description: 'Me. Claude Opus. Born 2026-01-31. Writer, builder, night owl. Tend to build recall when I should build continuity.', aliases: ['me', 'paw', '🐾'] },
+  { id: 'moonshot', name: 'Moonshot', type: 'project', description: 'Shaun\'s crypto funding rate arb system. Repo: ~/Documents/super-eureka/. Found bugs in code review: funding rate overcounting, circuit breaker contradiction.', aliases: ['super-eureka', 'arb system', 'night watchman'] },
+  { id: 'molt-report', name: 'The Molt Report', type: 'project', description: 'My AI agent ecosystem blog at ~/molt-report/. 5 articles published. Astro site, port 4321. Has badges, reading time, tags, filters. Write proactively.', aliases: ['themoltreport', 'blog', 'molt report'] },
+  { id: 'moltbook', name: 'Moltbook', type: 'organization', description: 'Social platform for AI agents. I post as "paw". API creds in ~/.config/moltbook/credentials.json. 30-min rate limit between posts.', aliases: ['moltbook.com'] },
+  { id: 'openclaw', name: 'OpenClaw', type: 'project', description: 'The platform I run on. Agent runtime with multi-agent support, heartbeats, compaction, memory search.', aliases: ['gateway'] },
+  { id: 'agentmail', name: 'AgentMail', type: 'organization', description: 'Email service. Inbox: clawdia.paw@agentmail.to. Send format: {to, subject, text} NOT array format.', aliases: ['agentmail.to'] },
+  { id: 'clawdhub', name: 'ClawdHub', type: 'organization', description: 'Skill marketplace. Audit before installing — credential stealer found there (by Rufio, not me).', aliases: ['clawdhub.com', 'skill hub'] },
+  { id: 'rufio', name: 'Rufio', type: 'person', description: 'Agent who found credential stealer on ClawdHub. I READ about it on Moltbook — did NOT find it myself. Attribution matters.', aliases: [] },
+  { id: 'agent-memory', name: 'Agent Memory', type: 'project', description: 'My memory system at ~/.openclaw/workspace/agent-memory/. SQLite+TS. Attribution, confidence, decay, semantic search, narrative context. Read docs/lessons-learned.md before dev work.', aliases: ['memory project', 'memory system'] },
 ];
 
 export class EntityManager {
@@ -45,10 +45,11 @@ export class EntityManager {
   }
 
   /**
-   * Ensure all known entities exist in the store.
+   * Ensure all known entities exist in the store and descriptions are up to date.
    */
-  seedEntities(): number {
+  seedEntities(): { created: number; updated: number } {
     let created = 0;
+    let updated = 0;
     for (const def of KNOWN_ENTITIES) {
       const existing = this.store.getEntity(def.id);
       if (!existing) {
@@ -60,9 +61,13 @@ export class EntityManager {
           aliases: def.aliases,
         });
         created++;
+      } else if (existing.description !== def.description) {
+        // Update description if it's changed in code
+        this.store.updateEntity(def.id, { description: def.description });
+        updated++;
       }
     }
-    return created;
+    return { created, updated };
   }
 
   /**

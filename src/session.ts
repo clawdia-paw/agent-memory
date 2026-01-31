@@ -114,10 +114,15 @@ export class SessionMemory {
 
     if (entities.length > 0 && budgetRemaining > 60) {
       addLine('\n## Entities');
-      const entityList = entities.slice(0, 8)
-        .map(e => `${e.name}(${e.memoryCount})`)
-        .join(', ');
-      addLine(entityList);
+      // Show top 5 with descriptions if budget allows, compact list for the rest
+      const top = entities.slice(0, 5);
+      const rest = entities.slice(5, 10);
+      for (const e of top) {
+        if (!addLine(`- **${e.name}**(${e.memoryCount}) ${e.description ? '— ' + e.description.slice(0, 80) : ''}`)) break;
+      }
+      if (rest.length > 0 && budgetRemaining > 20) {
+        addLine(`Also: ${rest.map(e => `${e.name}(${e.memoryCount})`).join(', ')}`);
+      }
     }
 
     // 4. Recent high-value memories (last 48h, deduplicated against pinned)

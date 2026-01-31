@@ -239,6 +239,16 @@ export class MemoryStore {
     return entity;
   }
 
+  updateEntity(id: string, updates: Partial<Pick<Entity, 'name' | 'description' | 'type'>>): void {
+    const fields: string[] = ['updated = ?'];
+    const values: any[] = [Date.now()];
+    if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name); }
+    if (updates.description !== undefined) { fields.push('description = ?'); values.push(updates.description); }
+    if (updates.type !== undefined) { fields.push('type = ?'); values.push(updates.type); }
+    values.push(id);
+    this.db.prepare(`UPDATE entities SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+  }
+
   getEntity(id: string): Entity | null {
     const row = this.db.prepare('SELECT * FROM entities WHERE id = ?').get(id) as any;
     if (!row) return null;
