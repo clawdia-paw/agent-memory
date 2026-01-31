@@ -210,6 +210,22 @@ export class RecallEngine {
     }).join('\n\n');
   }
 
+  /**
+   * Compact format — one line per result, designed for agent consumption.
+   * Shows content + source type + confidence. No bars, no extra metadata.
+   */
+  formatCompact(results: RecallResult[]): string {
+    if (results.length === 0) return 'No memories found.';
+
+    return results.map((r, i) => {
+      const m = r.memory;
+      const conf = Math.round(m.confidence.score * 100);
+      const src = m.attribution.type + (m.attribution.actor ? `/${m.attribution.actor}` : '');
+      const content = m.summary ?? m.content.slice(0, 120);
+      return `[${conf}% ${src}] ${content}`;
+    }).join('\n');
+  }
+
   // === Internal Scoring ===
 
   private textMatchScore(query: string, memory: Memory): number {

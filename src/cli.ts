@@ -125,14 +125,18 @@ async function cmdRecall() {
 
   const recall = new RecallEngine(store, embedder);
   
-  console.log(`🔍 Recalling: "${query}"\n`);
+  const compact = process.argv.includes('--compact') || process.argv.includes('-c');
+  const limitArg = getArg('--limit');
+  const queryLimit = limitArg ? parseInt(limitArg) : (compact ? 5 : 10);
+  
+  if (!compact) console.log(`🔍 Recalling: "${query}"\n`);
   
   const results = await recall.recall({
     text: query,
-    limit: 10,
+    limit: queryLimit,
   });
   
-  console.log(recall.formatResults(results));
+  console.log(compact ? recall.formatCompact(results) : recall.formatResults(results));
   
   if (!embedder) {
     console.log('\n💡 Set GEMINI_API_KEY for semantic search (currently text-only).');
