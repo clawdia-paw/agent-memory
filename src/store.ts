@@ -260,13 +260,26 @@ export class MemoryStore {
   // === Querying ===
 
   searchByText(text: string, limit: number = 10): Memory[] {
-    // Basic text search — semantic search will be layered on top
+    // Multi-term text search — each word is matched independently
+    const terms = text.toLowerCase().split(/\s+/).filter(t => t.length > 1);
+    if (terms.length === 0) return [];
+    
+    // Build WHERE clause: any term matches content, summary, or tags
+    const conditions = terms.map(() => 
+      '(LOWER(content) LIKE ? OR LOWER(summary) LIKE ? OR LOWER(tags) LIKE ?)'
+    ).join(' OR ');
+    const params: string[] = [];
+    for (const term of terms) {
+      params.push(`%${term}%`, `%${term}%`, `%${term}%`);
+    }
+    params.push(String(limit));
+
     const rows = this.db.prepare(`
       SELECT * FROM memories 
-      WHERE content LIKE ? OR summary LIKE ?
+      WHERE ${conditions}
       ORDER BY relevance_score DESC, created DESC
       LIMIT ?
-    `).all(`%${text}%`, `%${text}%`, limit) as any[];
+    `).all(...params) as any[];
     
     return rows.map(r => this.rowToMemory(r));
   }
