@@ -108,6 +108,7 @@ export interface RecallResult {
   memory: Memory;
   matchScore: number;    // How well this matched the query
   finalScore: number;    // matchScore × confidence × relevance (what we rank by)
+  matchReason?: string;  // Why this matched (text, semantic, entity)
 }
 
 // === Memory Creation (Input) ===

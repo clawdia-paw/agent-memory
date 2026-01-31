@@ -91,7 +91,7 @@ export class RecallEngine {
       const allEmbeddings = this.store.getAllEmbeddings();
       for (const { id, embedding } of allEmbeddings) {
         const sim = cosineSimilarity(queryEmbedding, embedding);
-        if (sim > 0.5) { // Minimum semantic similarity threshold (0.5 filters noise)
+        if (sim > 0.4) { // Minimum semantic similarity threshold
           if (!candidateMap.has(id)) {
             const mem = this.store.getMemory(id);
             if (mem) {
@@ -126,10 +126,18 @@ export class RecallEngine {
       // Context boost: if query has context, boost memories from similar contexts
       const contextBoost = query.context ? this.contextBoost(query.context, memory) : 1.0;
 
+      // Build match reason
+      const reasons: string[] = [];
+      if (scores.text > 0) reasons.push(`text:${Math.round(scores.text * 100)}%`);
+      if (scores.semantic > 0) reasons.push(`semantic:${Math.round(scores.semantic * 100)}%`);
+      if (scores.entity > 0) reasons.push('entity-match');
+      const matchReason = reasons.join(' + ') || 'category-filter';
+
       results.push({
         memory,
         matchScore,
         finalScore: finalScore * contextBoost,
+        matchReason,
       });
     }
 
@@ -197,7 +205,8 @@ export class RecallEngine {
         `   Confidence: [${confidenceBar}] ${(conf.score * 100).toFixed(0)}%`,
         `   Category: ${m.category} | Entities: ${m.entities.join(', ') || 'none'}`,
         m.pinned ? '   📌 Pinned (no decay)' : `   Relevance: ${(m.relevanceScore * 100).toFixed(0)}%`,
-      ].join('\n');
+        r.matchReason ? `   Match: ${r.matchReason} → score ${(r.finalScore * 100).toFixed(1)}%` : '',
+      ].filter(Boolean).join('\n');
     }).join('\n\n');
   }
 
