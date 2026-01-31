@@ -447,6 +447,36 @@ export class MemoryStore {
     };
   }
 
+  // === Embedding Storage ===
+
+  setEmbedding(memoryId: string, embedding: number[]): void {
+    const buffer = Buffer.from(new Float32Array(embedding).buffer);
+    this.db.prepare('UPDATE memories SET embedding = ? WHERE id = ?').run(buffer, memoryId);
+  }
+
+  getEmbedding(memoryId: string): number[] | null {
+    const row = this.db.prepare('SELECT embedding FROM memories WHERE id = ?').get(memoryId) as any;
+    if (!row?.embedding) return null;
+    return Array.from(new Float32Array(row.embedding.buffer));
+  }
+
+  getMemoriesWithoutEmbeddings(limit: number = 50): Memory[] {
+    const rows = this.db.prepare(
+      'SELECT * FROM memories WHERE embedding IS NULL ORDER BY created DESC LIMIT ?'
+    ).all(limit) as any[];
+    return rows.map(r => this.rowToMemory(r));
+  }
+
+  getAllEmbeddings(): Array<{ id: string; embedding: number[] }> {
+    const rows = this.db.prepare(
+      'SELECT id, embedding FROM memories WHERE embedding IS NOT NULL'
+    ).all() as any[];
+    return rows.map(r => ({
+      id: r.id,
+      embedding: Array.from(new Float32Array(r.embedding.buffer)),
+    }));
+  }
+
   close(): void {
     this.db.close();
   }

@@ -86,10 +86,23 @@ export class RecallEngine {
     // Semantic search (if embedder available)
     if (this.embedder) {
       const queryEmbedding = await this.embedder.embed(query.text);
-      // Score all candidates semantically
-      for (const [id, candidate] of candidateMap) {
-        if (candidate.memory.embedding) {
-          candidate.scores.semantic = cosineSimilarity(queryEmbedding, candidate.memory.embedding);
+      
+      // Also search ALL embeddings for semantic matches not found by text
+      const allEmbeddings = this.store.getAllEmbeddings();
+      for (const { id, embedding } of allEmbeddings) {
+        const sim = cosineSimilarity(queryEmbedding, embedding);
+        if (sim > 0.3) { // Minimum semantic similarity threshold
+          if (!candidateMap.has(id)) {
+            const mem = this.store.getMemory(id);
+            if (mem) {
+              candidateMap.set(id, {
+                memory: mem,
+                scores: { text: 0, semantic: sim, entity: 0 },
+              });
+            }
+          } else {
+            candidateMap.get(id)!.scores.semantic = sim;
+          }
         }
       }
     }

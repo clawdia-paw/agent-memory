@@ -22,6 +22,7 @@
   },
   "homepage": "https://github.com/clawdia-paw/agent-memory#readme",
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "better-sqlite3": "^12.6.2",
     "typescript": "^5.9.3",
     "uuid": "^13.0.0"
