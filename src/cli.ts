@@ -74,6 +74,9 @@ async function main() {
     case 'narrative':
       cmdNarrate();
       break;
+    case 'end':
+      cmdEnd();
+      break;
     case 'narratives':
       cmdNarratives();
       break;
@@ -428,6 +431,25 @@ function cmdSeed() {
   console.log(`📋 Entities: ${r.created} created, ${r.updated} updated`);
 }
 
+function cmdEnd() {
+  // Alias for narrate with better UX
+  const text = process.argv[3];
+  if (!text) {
+    console.log('📝 End-of-Session Reflection');
+    console.log('');
+    console.log('Usage: mem end "Your reflection in natural language"');
+    console.log('');
+    console.log('Capture what matters:');
+    console.log('  - What you were doing and why');
+    console.log('  - What questions you\'re carrying forward');
+    console.log('  - How the work felt');
+    console.log('');
+    console.log('Options: --mood <word> --projects <a,b> --questions <q1,q2>');
+    return;
+  }
+  cmdNarrate(); // Same implementation, different name
+}
+
 function cmdNarrate() {
   const text = process.argv[3];
   if (!text) {
@@ -474,15 +496,21 @@ function printHelp() {
 🧠 Agent Memory CLI
 
 Commands:
-  import                    Import MEMORY.md and daily logs
-  index                     Generate embeddings for semantic search
+  startup [--budget N]      Session startup context (default: 800 tokens)
   recall "query"            Search memories (alias: search, q)
-  entity [id]               List entities or show entity summary
-  reflect                   Run reflection cycle (decay, health check)
-  stats                     Show memory statistics
   add "content" [options]   Create a new memory
+  end "reflection"          End-of-session narrative (alias: narrate)
+  narratives                View recent narrative thread
+  entity [id]               List entities or show entity summary
+  stats                     Show memory statistics
+  audit                     Audit memory quality
+  prune [--confirm]         Remove low-quality memories
+  seed                      Update entity descriptions
+  reflect                   Run reflection cycle (decay, health check)
   verify <id>               Verify a memory against others
   contradictions            Find contradicting memories
+  import                    Import MEMORY.md and daily logs
+  index                     Generate embeddings for semantic search
 
 Options for 'add':
   --source TYPE             experienced|told|read|inferred|observed
