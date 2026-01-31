@@ -18,6 +18,7 @@ import { MemoryImporter } from './import.js';
 import { ReflectEngine } from './reflect.js';
 import { CorroborationEngine } from './corroborate.js';
 import { GeminiEmbedder, CachedEmbedder } from './embeddings.js';
+import { SessionMemory } from './session.js';
 import type { SourceType, MemoryCategory } from './types.js';
 import { resolve } from 'path';
 
@@ -60,6 +61,12 @@ async function main() {
       break;
     case 'contradictions':
       cmdContradictions();
+      break;
+    case 'startup':
+      await cmdStartup();
+      break;
+    case 'remember':
+      cmdRemember();
       break;
     default:
       printHelp();
@@ -251,6 +258,35 @@ function cmdContradictions() {
   const corr = new CorroborationEngine(store);
   const results = corr.findContradictions();
   console.log(CorroborationEngine.formatContradictions(results));
+}
+
+async function cmdStartup() {
+  store.close(); // Close the default store, use SessionMemory instead
+  const session = new SessionMemory();
+  const context = await session.getStartupContext();
+  console.log(context);
+  session.close();
+}
+
+function cmdRemember() {
+  const content = process.argv[3];
+  if (!content) {
+    console.error('Usage: remember "what you learned" --source TYPE [--actor NAME]');
+    return;
+  }
+  store.close();
+  const session = new SessionMemory();
+  const sourceType = (getArg('--source') ?? 'experienced') as any;
+  const result = session.remember(content, {
+    source: sourceType,
+    actor: getArg('--actor'),
+    context: getArg('--context'),
+    category: getArg('--category'),
+    entities: getArg('--entities')?.split(','),
+    pinned: process.argv.includes('--pinned'),
+  });
+  console.log(result);
+  session.close();
 }
 
 function getArg(flag: string): string | undefined {
