@@ -19,6 +19,7 @@ import { ReflectEngine } from './reflect.js';
 import { CorroborationEngine } from './corroborate.js';
 import { GeminiEmbedder, CachedEmbedder } from './embeddings.js';
 import { SessionMemory } from './session.js';
+import { NarrativeLayer } from './narrative.js';
 import type { SourceType, MemoryCategory } from './types.js';
 import { resolve } from 'path';
 
@@ -67,6 +68,13 @@ async function main() {
       break;
     case 'remember':
       cmdRemember();
+      break;
+    case 'narrate':
+    case 'narrative':
+      cmdNarrate();
+      break;
+    case 'narratives':
+      cmdNarratives();
       break;
     default:
       printHelp();
@@ -289,6 +297,37 @@ function cmdRemember() {
   });
   console.log(result);
   session.close();
+}
+
+function cmdNarrate() {
+  const text = process.argv[3];
+  if (!text) {
+    console.error('Usage: narrate "Your narrative paragraph" [--mood focused] [--projects p1,p2] [--questions q1,q2]');
+    return;
+  }
+  const narrative = new NarrativeLayer();
+  const path = narrative.save({
+    timestamp: Date.now(),
+    text,
+    mood: getArg('--mood'),
+    activeProjects: getArg('--projects')?.split(',') ?? [],
+    openQuestions: getArg('--questions')?.split(',') ?? [],
+  });
+  console.log(`📝 Narrative saved: ${path}`);
+}
+
+function cmdNarratives() {
+  const narrative = new NarrativeLayer();
+  const count = parseInt(getArg('--count') ?? '3');
+  const recent = narrative.getRecent(count);
+  
+  if (recent.length === 0) {
+    console.log('No narratives yet. Write one with: mem narrate "your narrative"');
+    return;
+  }
+  
+  console.log('📖 Recent Narratives:\n');
+  console.log(narrative.formatThread(recent));
 }
 
 function getArg(flag: string): string | undefined {

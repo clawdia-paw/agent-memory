@@ -11,6 +11,7 @@
 
 import { MemoryStore } from './store.js';
 import { RecallEngine } from './recall.js';
+import { NarrativeLayer } from './narrative.js';
 import { GeminiEmbedder, CachedEmbedder } from './embeddings.js';
 import { resolve } from 'path';
 import { mkdirSync } from 'fs';
@@ -21,11 +22,13 @@ const DB_PATH = process.env.AGENT_MEMORY_DB ?? resolve(HOME, '.agent-memory/memo
 export class SessionMemory {
   private store: MemoryStore;
   private recall: RecallEngine;
+  private narrative: NarrativeLayer;
 
   constructor(dbPath?: string) {
     const path = dbPath ?? DB_PATH;
     mkdirSync(resolve(path, '..'), { recursive: true });
     this.store = new MemoryStore(path);
+    this.narrative = new NarrativeLayer();
     
     let embedder;
     try {
@@ -58,6 +61,16 @@ export class SessionMemory {
       budgetRemaining -= cost;
       return true;
     };
+
+    // 0. Narrative context — the story you step into (highest priority)
+    const latestNarrative = this.narrative.getLatest();
+    if (latestNarrative) {
+      const narrativeBlock = this.narrative.formatForStartup(latestNarrative);
+      for (const line of narrativeBlock.split('\n')) {
+        if (!addLine(line)) break;
+      }
+      addLine(''); // spacer
+    }
 
     // 1. Identity (always included, ~3 lines, ~50 tokens)
     const allMemories = this.store.getAllMemories(500);
