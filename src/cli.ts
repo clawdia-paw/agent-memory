@@ -80,6 +80,12 @@ async function main() {
     case 'seed':
       cmdSeed();
       break;
+    case 'audit':
+      cmdAudit();
+      break;
+    case 'prune':
+      cmdPrune();
+      break;
     default:
       printHelp();
   }
@@ -330,6 +336,92 @@ function cmdRemember() {
   session.close();
 }
 
+function cmdAudit() {
+  const all = store.getAllMemories(500);
+  
+  // Find low-quality memories: short content, no summary, never accessed, defaulted attribution
+  const suspicious: typeof all = [];
+  const neverAccessed: typeof all = [];
+  const noSummary: typeof all = [];
+  const tooShort: typeof all = [];
+
+  for (const m of all) {
+    if (m.accessCount === 0 && !m.pinned) neverAccessed.push(m);
+    if (!m.summary && m.content.length > 50) noSummary.push(m);
+    if (m.content.length < 30) tooShort.push(m);
+    // Suspicious: experienced at 95% but looks like it was imported (no entities linked, generic content)
+    if (m.attribution.type === 'experienced' && m.confidence.score === 0.95 && m.content.length < 60) {
+      suspicious.push(m);
+    }
+  }
+
+  console.log('🔍 Memory Audit\n');
+  console.log(`Total memories: ${all.length}`);
+  console.log(`Never accessed (not pinned): ${neverAccessed.length}`);
+  console.log(`Missing summary: ${noSummary.length}`);
+  console.log(`Very short (<30 chars): ${tooShort.length}`);
+  console.log(`Suspicious (experienced+95%+short): ${suspicious.length}`);
+
+  if (tooShort.length > 0) {
+    console.log('\n📋 Very short memories (candidates for removal):');
+    for (const m of tooShort.slice(0, 10)) {
+      console.log(`  [${m.id.slice(0, 8)}] "${m.content}"`);
+    }
+  }
+
+  if (suspicious.length > 0) {
+    console.log('\n⚠️  Suspicious imports (experienced+95%+short):');
+    for (const m of suspicious.slice(0, 10)) {
+      console.log(`  [${m.id.slice(0, 8)}] "${m.content}"`);
+    }
+  }
+
+  // Quality score distribution
+  const qualityBuckets = { high: 0, medium: 0, low: 0 };
+  for (const m of all) {
+    const hasGoodContent = m.content.length > 50;
+    const hasSummary = !!m.summary;
+    const hasEntities = m.tags.length > 0;
+    const isAccessed = m.accessCount > 0;
+    const score = (hasGoodContent ? 1 : 0) + (hasSummary ? 1 : 0) + (hasEntities ? 1 : 0) + (isAccessed ? 1 : 0);
+    if (score >= 3) qualityBuckets.high++;
+    else if (score >= 2) qualityBuckets.medium++;
+    else qualityBuckets.low++;
+  }
+  console.log(`\n📊 Quality: ${qualityBuckets.high} high, ${qualityBuckets.medium} medium, ${qualityBuckets.low} low`);
+}
+
+function cmdPrune() {
+  const dryRun = !hasFlag('--confirm');
+  const all = store.getAllMemories(500);
+  
+  const toRemove: { id: string; reason: string; content: string }[] = [];
+
+  for (const m of all) {
+    // Section headers (very short, no real info)
+    if (m.content.length < 30 && !m.pinned) {
+      toRemove.push({ id: m.id, reason: 'too short (<30 chars)', content: m.content });
+    }
+  }
+
+  if (toRemove.length === 0) {
+    console.log('✅ No memories to prune.');
+    return;
+  }
+
+  console.log(`🗑️  Pruning ${toRemove.length} low-quality memories${dryRun ? ' (DRY RUN — add --confirm to delete)' : ''}:\n`);
+  for (const m of toRemove) {
+    console.log(`  [${m.id.slice(0, 8)}] ${m.reason}: "${m.content}"`);
+    if (!dryRun) {
+      store.deleteMemory(m.id);
+    }
+  }
+
+  if (!dryRun) {
+    console.log(`\n✅ Deleted ${toRemove.length} memories.`);
+  }
+}
+
 function cmdSeed() {
   const em = new EntityManager(store);
   const r = em.seedEntities();
@@ -365,6 +457,10 @@ function cmdNarratives() {
   
   console.log('📖 Recent Narratives:\n');
   console.log(narrative.formatThread(recent));
+}
+
+function hasFlag(flag: string): boolean {
+  return process.argv.includes(flag);
 }
 
 function getArg(flag: string): string | undefined {
