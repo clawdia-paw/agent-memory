@@ -12,6 +12,7 @@ import { MemoryStore } from './store.js';
 import { RecallEngine } from './recall.js';
 import { MemoryImporter } from './import.js';
 import { ReflectEngine } from './reflect.js';
+import { EntityManager } from './entities.js';
 import { GeminiEmbedder, CachedEmbedder } from './embeddings.js';
 import { resolve } from 'path';
 import { mkdirSync, existsSync } from 'fs';
@@ -50,7 +51,12 @@ async function migrate() {
   }
 
   const store = new MemoryStore(DB_PATH);
+  const entityMgr = new EntityManager(store);
   const importer = new MemoryImporter(store);
+
+  // Step 0: Seed known entities
+  const seeded = entityMgr.seedEntities();
+  console.log(`📋 Seeded ${seeded} known entities.`);
 
   // Step 1: Import
   console.log('📥 Step 1: Importing flat-file memories...');

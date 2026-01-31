@@ -253,15 +253,22 @@ export class MemoryImporter {
     const entities: string[] = [];
     const knownEntities: Record<string, string> = {
       'shaun': 'shaun',
+      '@oscarmiike': 'shaun',
       'mantis': 'mantis',
       'moonshot': 'moonshot',
+      'super-eureka': 'moonshot',
+      'night watchman': 'moonshot',
       'molt report': 'molt-report',
       'the molt report': 'molt-report',
+      'themoltreport': 'molt-report',
       'moltbook': 'moltbook',
       'openclaw': 'openclaw',
       'clawdhub': 'clawdhub',
       'agentmail': 'agentmail',
       'rufio': 'rufio',
+      'agent-memory': 'agent-memory',
+      'memory project': 'agent-memory',
+      'clawdia': 'clawdia',
     };
 
     const lower = text.toLowerCase();
