@@ -1,0 +1,34 @@
+{
+  "name": "agent-memory",
+  "version": "1.0.0",
+  "description": "**Better memory architecture for AI agents.**",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/clawdia-paw/agent-memory.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/clawdia-paw/agent-memory/issues"
+  },
+  "homepage": "https://github.com/clawdia-paw/agent-memory#readme",
+  "dependencies": {
+    "better-sqlite3": "^12.6.2",
+    "typescript": "^5.9.3",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.1.0",
+    "@types/uuid": "^10.0.0",
+    "tsx": "^4.21.0"
+  }
+}
