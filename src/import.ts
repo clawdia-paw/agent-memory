@@ -199,25 +199,52 @@ export class MemoryImporter {
   private inferSourceType(text: string): SourceType {
     const lower = text.toLowerCase();
     
-    // Direct experience indicators
-    if (/\b(i did|i built|i found|i tried|i discovered|i created|i wrote)\b/.test(lower)) return 'experienced';
-    if (/\b(i noticed|i observed|i saw|i watched)\b/.test(lower)) return 'observed';
-    if (/\b(told me|said|his words|her words|they said)\b/.test(lower)) return 'told';
-    if (/\b(i read|article|post|documentation|docs)\b/.test(lower)) return 'read';
-    if (/\b(i think|i believe|seems like|probably|likely|my theory)\b/.test(lower)) return 'inferred';
+    // Told indicators (check first — quotes and attributions are strong signals)
+    if (/\b(told me|said|his words|her words|they said|"make all|"be proactive)\b/.test(lower)) return 'told';
+    if (/\bshaun('s guidance|'s words| asked| wants| offered| approved| facilitat)/i.test(lower)) return 'told';
     
-    // Default: if it's in MEMORY.md, it's likely experienced or read
+    // Read indicators
+    if (/\b(i read|article|post |blog|documentation|eudaemon|moltbook post)\b/.test(lower)) return 'read';
+    if (/\b(rufio found|security analysis|upvotes|comments)\b/.test(lower)) return 'read';
+    
+    // Inferred / opinion indicators
+    if (/\b(i think|i believe|seems like|probably|likely|my theory|strong candidate|recommend)\b/.test(lower)) return 'inferred';
+    if (/\b(should|better than|worse than|opinion|insight)\b/.test(lower)) return 'inferred';
+    
+    // Observed
+    if (/\b(i noticed|i observed|i saw|i watched|named themselves)\b/.test(lower)) return 'observed';
+    
+    // Experienced (explicit actions)
+    if (/\b(i did|i built|i found|i tried|i discovered|i created|i wrote|implemented|configured|set up|published)\b/.test(lower)) return 'experienced';
+    
+    // Config/technical entries are experienced (I set them up)
+    if (/\b(api|endpoint|config|port |path:|enabled|token|key)\b/.test(lower)) return 'experienced';
+    
+    // Default: fact-like statements without attribution → experienced
     return 'experienced';
   }
 
   private inferCategory(text: string): MemoryCategory {
     const lower = text.toLowerCase();
     
-    if (/\b(api|endpoint|format|command|config|use|how to|run|install)\b/.test(lower)) return 'procedure';
-    if (/\b(i think|i believe|opinion|should|better|worse|prefer)\b/.test(lower)) return 'opinion';
-    if (/\b(happened|event|born|created|started|launched|published)\b/.test(lower)) return 'event';
-    if (/\b(prefers?|likes?|wants?|favorite|always)\b/.test(lower)) return 'preference';
-    if (/\b(is a|works at|lives in|relationship|friend|peer|mentor)\b/.test(lower)) return 'relationship';
+    // Procedures: how to do things, technical details
+    if (/\b(api|endpoint|format|command|config|use |how to|run |install|send |post |get )\b/.test(lower)) return 'procedure';
+    if (/\b(bsb|account no|bearer|token:|key:|port \d)\b/.test(lower)) return 'procedure';
+    
+    // Opinions: subjective beliefs
+    if (/\b(i think|i believe|opinion|strong candidate|recommend|insight)\b/.test(lower)) return 'opinion';
+    
+    // Events: things that happened  
+    if (/\b(happened|born|created|started|launched|published|found|discovered|set up|fixed)\b/.test(lower)) return 'event';
+    
+    // Preferences: what people want
+    if (/\b(prefers?|likes?|wants|favorite|always|don't like|autonomy|green light)\b/.test(lower)) return 'preference';
+    
+    // Relationships: connections between entities
+    if (/\b(is a |works at|lives in|friend|peer|mentor|human|agent|partner)\b/.test(lower)) return 'relationship';
+    
+    // Observations: things noticed
+    if (/\b(noticed|observed|interesting|pattern|trend)\b/.test(lower)) return 'observation';
     
     return 'fact';
   }

@@ -91,7 +91,7 @@ export class RecallEngine {
       const allEmbeddings = this.store.getAllEmbeddings();
       for (const { id, embedding } of allEmbeddings) {
         const sim = cosineSimilarity(queryEmbedding, embedding);
-        if (sim > 0.3) { // Minimum semantic similarity threshold
+        if (sim > 0.5) { // Minimum semantic similarity threshold (0.5 filters noise)
           if (!candidateMap.has(id)) {
             const mem = this.store.getMemory(id);
             if (mem) {
@@ -133,9 +133,11 @@ export class RecallEngine {
       });
     }
 
-    // Step 3: Rank and return
-    results.sort((a, b) => b.finalScore - a.finalScore);
-    return results.slice(0, limit);
+    // Step 3: Filter weak results, rank, and return
+    const minFinalScore = 0.15; // Below this, the result is noise
+    const filtered = results.filter(r => r.finalScore >= minFinalScore);
+    filtered.sort((a, b) => b.finalScore - a.finalScore);
+    return filtered.slice(0, limit);
   }
 
   /**
