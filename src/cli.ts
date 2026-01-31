@@ -263,7 +263,9 @@ function cmdContradictions() {
 async function cmdStartup() {
   store.close(); // Close the default store, use SessionMemory instead
   const session = new SessionMemory();
-  const context = await session.getStartupContext();
+  const budgetArg = getArg('--budget');
+  const budget = budgetArg ? parseInt(budgetArg) : 800;
+  const context = await session.getStartupContext(budget);
   console.log(context);
   session.close();
 }

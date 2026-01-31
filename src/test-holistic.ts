@@ -294,12 +294,12 @@ console.log('\n━━━ 5. Startup Context ━━━');
   });
 
   test('Startup context has core memory section', () => {
-    if (!context.includes('Core Memory')) return 'Missing Core Memory section';
+    if (!context.includes('Core (Pinned)')) return 'Missing Core Memory section';
     return true;
   });
 
   test('Startup context has entity section', () => {
-    if (!context.includes('Key Entities')) return 'Missing Key Entities section';
+    if (!context.includes('Entities')) return 'Missing Key Entities section';
     return true;
   });
 

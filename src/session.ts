@@ -37,54 +37,105 @@ export class SessionMemory {
   }
 
   /**
-   * Generate a startup context block — the essential memories for beginning a session.
-   * This replaces reading MEMORY.md.
+   * Generate a startup context block with a strict token budget.
+   * 
+   * The budget system works like this:
+   * 1. Reserve space for each section (identity, pinned, recent, entities, stats)
+   * 2. Fill sections in priority order, stopping when budget is exhausted
+   * 3. Each memory line is ~30 tokens. We estimate rather than count exactly.
+   * 
+   * Default budget: 800 tokens (~3.2KB). Configurable via maxTokens.
    */
-  async getStartupContext(): Promise<string> {
+  async getStartupContext(maxTokens: number = 800): Promise<string> {
+    const TOKENS_PER_LINE = 35; // Conservative estimate for a memory line
+    let budgetRemaining = maxTokens;
     const sections: string[] = [];
 
-    // 1. Identity & core facts (pinned memories)
-    const pinned = this.store.getAllMemories(200).filter(m => m.pinned);
-    if (pinned.length > 0) {
-      sections.push('## Core Memory (Pinned)');
-      for (const m of pinned.slice(0, 20)) {
-        const src = m.attribution.type + (m.attribution.actor ? `/${m.attribution.actor}` : '');
-        sections.push(`- [${Math.round(m.confidence.score * 100)}% ${src}] ${m.summary ?? m.content.slice(0, 120)}`);
-      }
-    }
+    const addLine = (line: string): boolean => {
+      const cost = Math.ceil(line.length / 3.2); // ~3.2 chars per token (conservative)
+      if (cost > budgetRemaining) return false;
+      sections.push(line);
+      budgetRemaining -= cost;
+      return true;
+    };
 
-    // 2. Recent memories (last 48h, high confidence)
-    const recentCutoff = Date.now() - 48 * 60 * 60 * 1000;
-    const recent = this.store.getAllMemories(200)
-      .filter(m => m.created > recentCutoff && m.confidence.score >= 0.5)
-      .sort((a, b) => b.created - a.created)
-      .slice(0, 15);
+    // 1. Identity (always included, ~3 lines, ~50 tokens)
+    const allMemories = this.store.getAllMemories(500);
+    const pinned = allMemories.filter(m => m.pinned);
+    const identityPinned = pinned.filter(m => 
+      m.content.toLowerCase().includes('name:') || 
+      m.content.toLowerCase().includes('born:') || 
+      m.content.toLowerCase().includes('human:')
+    );
     
-    if (recent.length > 0) {
-      sections.push('\n## Recent (Last 48h)');
-      for (const m of recent) {
+    addLine('## Identity');
+    for (const m of identityPinned.slice(0, 3)) {
+      if (!addLine(`- ${m.content.slice(0, 80)}`)) break;
+    }
+
+    // 2. Pinned procedures & lessons (highest value — these prevent mistakes)
+    // Sort by access count (most-used first) then by confidence
+    const procedurePins = pinned
+      .filter(m => !identityPinned.includes(m))
+      .sort((a, b) => (b.accessCount - a.accessCount) || (b.confidence.score - a.confidence.score));
+
+    if (procedurePins.length > 0) {
+      addLine('\n## Core (Pinned)');
+      for (const m of procedurePins) {
         const src = m.attribution.type + (m.attribution.actor ? `/${m.attribution.actor}` : '');
-        sections.push(`- [${Math.round(m.confidence.score * 100)}% ${src}] ${m.summary ?? m.content.slice(0, 120)}`);
+        if (!addLine(`- [${Math.round(m.confidence.score * 100)}% ${src}] ${m.summary ?? m.content.slice(0, 100)}`)) break;
       }
     }
 
-    // 3. Key entities summary
+    // 3. Entity summary (compact, cheap — before recent which eats budget)
     const entities = this.store.getAllEntities()
       .filter(e => e.memoryCount > 0)
-      .sort((a, b) => b.memoryCount - a.memoryCount)
-      .slice(0, 10);
-    
-    if (entities.length > 0) {
-      sections.push('\n## Key Entities');
-      for (const e of entities) {
-        sections.push(`- **${e.name}** (${e.type}) — ${e.memoryCount} memories${e.description ? `. ${e.description}` : ''}`);
+      .sort((a, b) => b.memoryCount - a.memoryCount);
+
+    if (entities.length > 0 && budgetRemaining > 60) {
+      addLine('\n## Entities');
+      const entityList = entities.slice(0, 8)
+        .map(e => `${e.name}(${e.memoryCount})`)
+        .join(', ');
+      addLine(entityList);
+    }
+
+    // 4. Recent high-value memories (last 48h, deduplicated against pinned)
+    const recentCutoff = Date.now() - 48 * 60 * 60 * 1000;
+    const pinnedIds = new Set(pinned.map(m => m.id));
+    const recent = allMemories
+      .filter(m => 
+        m.created > recentCutoff && 
+        m.confidence.score >= 0.5 && 
+        !pinnedIds.has(m.id) &&
+        (m.content.length > 20) && // Filter out section headers and tiny entries
+        !m.content.match(/^(#{1,4}\s|Key |What |Services |Other)/) // Skip markdown headers imported as memories
+      )
+      .sort((a, b) => {
+        // Rank by: (entities > 0 ? bonus) × confidence × recency
+        const entityBonus = (e: typeof a) => e.entities.length > 0 ? 1.3 : 1.0;
+        const scoreA = entityBonus(a) * a.confidence.score * (1 + (a.created - recentCutoff) / (48 * 60 * 60 * 1000));
+        const scoreB = entityBonus(b) * b.confidence.score * (1 + (b.created - recentCutoff) / (48 * 60 * 60 * 1000));
+        return scoreB - scoreA;
+      });
+
+    if (recent.length > 0 && budgetRemaining > 100) {
+      addLine('\n## Recent');
+      for (const m of recent) {
+        const src = m.attribution.type + (m.attribution.actor ? `/${m.attribution.actor}` : '');
+        if (!addLine(`- [${Math.round(m.confidence.score * 100)}% ${src}] ${m.summary ?? m.content.slice(0, 100)}`)) break;
       }
     }
 
-    // 4. Stats
+    // 5. Stats (one line)
     const stats = this.store.getStats();
-    sections.push(`\n## Memory Stats`);
-    sections.push(`Total: ${stats.memories} memories, ${stats.entities} entities | Avg confidence: ${stats.avgConfidence} | Avg relevance: ${stats.avgRelevance}`);
+    if (budgetRemaining > 20) {
+      addLine(`\n📊 ${stats.memories} memories, ${stats.entities} entities, avg confidence ${stats.avgConfidence}`);
+    }
+
+    // 6. Budget info
+    const usedTokens = maxTokens - budgetRemaining;
+    addLine(`[${usedTokens}/${maxTokens} tokens used]`);
 
     return sections.join('\n');
   }
