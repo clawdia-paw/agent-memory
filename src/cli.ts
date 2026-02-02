@@ -21,8 +21,9 @@ import { GeminiEmbedder, CachedEmbedder } from './embeddings.js';
 import { SessionMemory } from './session.js';
 import { NarrativeLayer } from './narrative.js';
 import { EntityManager } from './entities.js';
+import { SyncEngine } from './sync.js';
 import type { SourceType, MemoryCategory } from './types.js';
-import { resolve } from 'path';
+import { resolve, relative } from 'path';
 
 const DB_PATH = process.env.AGENT_MEMORY_DB ?? resolve(process.env.HOME ?? '.', '.agent-memory/memory.db');
 
@@ -35,6 +36,9 @@ const command = process.argv[2];
 
 async function main() {
   switch (command) {
+    case 'sync':
+      cmdSync();
+      break;
     case 'import':
       await cmdImport();
       break;
@@ -93,6 +97,44 @@ async function main() {
       printHelp();
   }
   store.close();
+}
+
+function cmdSync() {
+  const workspacePath = getArg('--workspace') ?? resolve(process.env.HOME ?? '.', '.openclaw/workspace');
+  const force = hasFlag('--force');
+  const statusOnly = hasFlag('--status');
+
+  const sync = new SyncEngine(store);
+
+  if (statusOnly) {
+    const files = sync.status();
+    if (files.length === 0) {
+      console.log('No files synced yet. Run `mem sync` to index workspace files.');
+      return;
+    }
+    console.log('📋 Synced files:\n');
+    for (const f of files) {
+      const ago = Math.round((Date.now() - f.lastSynced) / 60000);
+      const rel = relative(workspacePath, f.filePath);
+      console.log(`  ${rel} — ${f.factsCount} facts (synced ${ago}m ago)`);
+    }
+    return;
+  }
+
+  console.log(`🔄 Syncing workspace: ${workspacePath}${force ? ' (forced)' : ''}\n`);
+  const stats = sync.sync(workspacePath, { force });
+
+  console.log(`   Files scanned:    ${stats.filesScanned}`);
+  console.log(`   Files changed:    ${stats.filesChanged}`);
+  console.log(`   Facts extracted:  ${stats.factsExtracted}`);
+  console.log(`   Noise skipped:    ${stats.factsSkipped}`);
+  console.log(`   Old facts removed: ${stats.oldFactsRemoved}`);
+
+  if (stats.filesChanged === 0) {
+    console.log('\n✅ Everything up to date.');
+  } else {
+    console.log(`\n✅ Synced ${stats.factsExtracted} facts from ${stats.filesChanged} files.`);
+  }
 }
 
 function cmdImport() {
@@ -496,6 +538,7 @@ function printHelp() {
 🧠 Agent Memory CLI
 
 Commands:
+  sync [--force] [--status] Index workspace markdown files (bridge mode)
   startup [--budget N]      Session startup context (default: 800 tokens)
   recall "query"            Search memories (alias: search, q)
   add "content" [options]   Create a new memory
@@ -509,7 +552,7 @@ Commands:
   reflect                   Run reflection cycle (decay, health check)
   verify <id>               Verify a memory against others
   contradictions            Find contradicting memories
-  import                    Import MEMORY.md and daily logs
+  import                    Import MEMORY.md and daily logs (legacy)
   index                     Generate embeddings for semantic search
 
 Options for 'add':
