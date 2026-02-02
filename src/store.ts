@@ -327,7 +327,7 @@ export class MemoryStore {
     
     // Get all non-pinned memories
     const memories = this.db.prepare(
-      'SELECT id, relevance_score, decay_rate, last_accessed, pinned FROM memories WHERE pinned = 0'
+      'SELECT id, relevance_score, decay_rate, last_accessed, access_count, pinned FROM memories WHERE pinned = 0'
     ).all() as any[];
 
     let updated = 0;
@@ -339,8 +339,15 @@ export class MemoryStore {
     const transaction = this.db.transaction(() => {
       for (const mem of memories) {
         const daysSinceAccess = (now - mem.last_accessed) / ONE_DAY;
-        // Exponential decay: relevance = e^(-decayRate * days)
-        const newRelevance = Math.exp(-mem.decay_rate * daysSinceAccess * 0.01);
+        // Frequency resistance: high-access memories decay slower
+        // dampening = 1 / (1 + log2(1 + accessCount))
+        // accessCount=0 → dampening=1.0 (no resistance)
+        // accessCount=3 → dampening=0.5 (half decay rate)
+        // accessCount=15 → dampening=0.25 (quarter decay rate)
+        const frequencyDampening = 1 / (1 + Math.log2(1 + (mem.access_count ?? 0)));
+        const effectiveDecayRate = mem.decay_rate * frequencyDampening;
+        // Exponential decay: relevance = e^(-effectiveDecayRate * days)
+        const newRelevance = Math.exp(-effectiveDecayRate * daysSinceAccess * 0.01);
         const clamped = Math.max(0, Math.min(1, newRelevance));
         
         if (clamped !== mem.relevance_score) {
@@ -353,6 +360,23 @@ export class MemoryStore {
 
     transaction();
     return { updated, archived };
+  }
+
+  /**
+   * Get the decay tier for a memory based on last access time and access count.
+   * Hot: accessed in last 7 days
+   * Warm: accessed 8-30 days ago  
+   * Cold: not accessed in 30+ days
+   * High-access memories (10+) get promoted one tier (cold→warm, warm→hot).
+   */
+  getDecayTier(memory: Memory): 'hot' | 'warm' | 'cold' {
+    const now = Date.now();
+    const daysSinceAccess = (now - memory.lastAccessed) / 86400000;
+    const highFrequency = memory.accessCount >= 10;
+
+    if (daysSinceAccess <= 7) return 'hot';
+    if (daysSinceAccess <= 30) return highFrequency ? 'hot' : 'warm';
+    return highFrequency ? 'warm' : 'cold';
   }
 
   // === Stats ===

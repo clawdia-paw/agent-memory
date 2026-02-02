@@ -171,6 +171,111 @@ describe('MemoryStore', () => {
     });
   });
 
+  describe('frequency resistance in decay', () => {
+    it('frequently-accessed memories decay slower than rarely-accessed ones', () => {
+      // Create two memories with the same category/decay rate
+      const frequent = store.createMemory({
+        content: 'Frequently accessed',
+        attribution: { type: 'experienced' },
+        category: 'event',
+      });
+      const rare = store.createMemory({
+        content: 'Rarely accessed',
+        attribution: { type: 'experienced' },
+        category: 'event',
+      });
+
+      // Simulate frequent access (20 times) — getMemory increments access_count
+      for (let i = 0; i < 20; i++) {
+        store.getMemory(frequent.id);
+      }
+
+      // Backdate both memories' last_accessed to 15 days ago
+      const fifteenDaysAgo = Date.now() - 15 * 86400000;
+      const db = (store as any).db;
+      db.prepare('UPDATE memories SET last_accessed = ? WHERE id = ?').run(fifteenDaysAgo, frequent.id);
+      db.prepare('UPDATE memories SET last_accessed = ? WHERE id = ?').run(fifteenDaysAgo, rare.id);
+
+      store.applyDecay();
+
+      const freqMem = store.getMemory(frequent.id)!;
+      const rareMem = store.getMemory(rare.id)!;
+
+      // Frequently accessed should have higher relevance (slower decay)
+      expect(freqMem.relevanceScore).toBeGreaterThan(rareMem.relevanceScore);
+    });
+
+    it('zero-access memories decay at base rate', () => {
+      const mem = store.createMemory({
+        content: 'Never accessed after creation',
+        attribution: { type: 'experienced' },
+        category: 'fact',
+      });
+
+      // Backdate to 10 days ago
+      const tenDaysAgo = Date.now() - 10 * 86400000;
+      const db = (store as any).db;
+      db.prepare('UPDATE memories SET last_accessed = ? WHERE id = ?').run(tenDaysAgo, mem.id);
+
+      store.applyDecay();
+
+      const updated = store.getMemory(mem.id)!;
+      // Should decay at base rate: e^(-0.1 * 10 * 0.01) ≈ 0.99 for fact category
+      expect(updated.relevanceScore).toBeLessThan(1.0);
+      expect(updated.relevanceScore).toBeGreaterThan(0.9);
+    });
+  });
+
+  describe('decay tiers', () => {
+    it('returns hot for recently accessed memories', () => {
+      const mem = store.createMemory({
+        content: 'Recent',
+        attribution: { type: 'experienced' },
+        category: 'fact',
+      });
+      expect(store.getDecayTier(mem)).toBe('hot');
+    });
+
+    it('returns warm for memories accessed 8-30 days ago', () => {
+      const mem = store.createMemory({
+        content: 'Older',
+        attribution: { type: 'experienced' },
+        category: 'fact',
+      });
+      // Fake lastAccessed to 15 days ago
+      mem.lastAccessed = Date.now() - 15 * 86400000;
+      mem.accessCount = 0;
+      expect(store.getDecayTier(mem)).toBe('warm');
+    });
+
+    it('returns cold for memories not accessed in 30+ days', () => {
+      const mem = store.createMemory({
+        content: 'Old',
+        attribution: { type: 'experienced' },
+        category: 'fact',
+      });
+      mem.lastAccessed = Date.now() - 45 * 86400000;
+      mem.accessCount = 0;
+      expect(store.getDecayTier(mem)).toBe('cold');
+    });
+
+    it('promotes high-frequency memories one tier', () => {
+      const mem = store.createMemory({
+        content: 'Frequent but old',
+        attribution: { type: 'experienced' },
+        category: 'fact',
+      });
+      // 45 days old but accessed 15 times → cold promoted to warm
+      mem.lastAccessed = Date.now() - 45 * 86400000;
+      mem.accessCount = 15;
+      expect(store.getDecayTier(mem)).toBe('warm');
+
+      // 15 days old with high access → warm promoted to hot
+      mem.lastAccessed = Date.now() - 15 * 86400000;
+      expect(store.getDecayTier(mem)).toBe('hot');
+    });
+  });
+
   describe('stats', () => {
     it('returns correct stats', () => {
       store.createMemory({ content: 'A', attribution: { type: 'experienced' }, category: 'fact' });
